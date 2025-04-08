@@ -488,6 +488,108 @@ void Bme680Read(uint8_t bmp_idx) {
 
 #endif  // USE_BME68X
 
+#ifdef USE_BME58X
+
+#include <bmp5.h>
+
+struct bmp5_dev *bmp5_device = nullptr;
+struct bmp5_osr_odr_press_config *bmp5_osr_odr_press_cfg = nullptr;
+struct bmp5_iir_config *bmp5_set_iir_cfg = nullptr;
+
+uint8_t Bmp5_bus = 0;
+
+// Bmp5 callbacks
+static void Bmp5_Delayus(uint32_t period, void *intf_ptr) {
+  delayMicroseconds(period);
+}
+int8_t Bmp5_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr) {
+  uint8_t dev_addr = *(uint8_t*)intf_ptr;
+  return I2cReadBuffer(dev_addr, reg_addr, reg_data, (uint16_t)len, Bmp5_bus);
+}
+int8_t Bmp5_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr) {
+  uint8_t dev_addr = *(uint8_t*)intf_ptr;
+  return I2cWriteBuffer(dev_addr, reg_addr, (uint8_t *)reg_data, (uint16_t)len, Bmp5_bus);
+}
+
+bool Bme5Init(uint8_t bmp_idx) {
+  Bmp5_bus = bmp_sensors[bmp_idx].bmp_bus;
+
+  if (!bmp5_device) {
+    bmp5_device = (bmp5_dev*)malloc(BMP_MAX_SENSORS * sizeof(bmp5_dev));
+    bmp5_osr_odr_press_cfg = (bmp5_osr_odr_press_config*)malloc(BMP_MAX_SENSORS * sizeof(bmp5_osr_odr_press_config));
+    bmp5_set_iir_cfg = (bmp5_iir_config*)malloc(BMP_MAX_SENSORS * sizeof(bmp5_iir_config));
+  }
+  if (!bmp5_device) { return false; }
+
+  bmp5_device[bmp_idx].intf_ptr = &bmp_sensors[bmp_idx].bmp_address;
+  bmp5_device[bmp_idx].intf = BMP5_I2C_INTF;
+  bmp5_device[bmp_idx].read = Bmp5_i2c_read;
+  bmp5_device[bmp_idx].write = Bmp5_i2c_write;
+  bmp5_device[bmp_idx].delay_us = Bmp5_Delayus;
+  int8_t rslt = bmp5_init(&bmp5_device[bmp_idx]);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: init result %d"), rslt);
+  if (rslt != BMP5_OK) { return false; }
+
+  // Make sure it is in standby mode to start
+  rslt = bmp5_set_power_mode(BMP5_POWERMODE_STANDBY,  &bmp5_device[bmp_idx]);
+  if (rslt != BMP5_OK) { return false; }
+
+  // Enable pressure measurements (automatically enables temperature measurements)
+  bmp5_osr_odr_press_cfg[bmp_idx].press_en = BMP5_ENABLE;
+  // Set ODR as 10Hz
+  bmp5_osr_odr_press_cfg[bmp_idx].odr = BMP5_ODR_10_HZ;  
+  // Set Over-sampling rate with respect to odr
+  bmp5_osr_odr_press_cfg[bmp_idx].osr_t = BMP5_OVERSAMPLING_64X;   // temperature Over-sampling
+  bmp5_osr_odr_press_cfg[bmp_idx].osr_p = BMP5_OVERSAMPLING_128X;  // pressure Over-sampling
+  rslt = bmp5_set_osr_odr_press_config(&bmp5_osr_odr_press_cfg[bmp_idx], &bmp5_device[bmp_idx]);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: osr odr result %d"), rslt);
+  if (rslt != BMP5_OK) { return false; }
+
+  // Set filter
+  bmp5_set_iir_cfg[bmp_idx].iir_flush_forced_en = BMP5_ENABLE;
+  rslt = bmp5_set_iir_config(&bmp5_set_iir_cfg[bmp_idx], &bmp5_device[bmp_idx]);
+
+  if (rslt == BMP5_OK)
+  {
+    bmp5_set_iir_cfg[bmp_idx].set_iir_t = BMP5_IIR_FILTER_COEFF_1;
+    bmp5_set_iir_cfg[bmp_idx].set_iir_p = BMP5_IIR_FILTER_COEFF_1;
+    bmp5_set_iir_cfg[bmp_idx].shdw_set_iir_t = BMP5_ENABLE;
+    bmp5_set_iir_cfg[bmp_idx].shdw_set_iir_p = BMP5_ENABLE;
+    rslt = bmp5_set_iir_config(&bmp5_set_iir_cfg[bmp_idx], &bmp5_device[bmp_idx]);
+    AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: iir filter result %d"), rslt);  
+  }
+
+  return true;
+}
+void Bme5Read(uint8_t bmp_idx) {
+  if (!bmp5_device) { return; }
+
+  Bmp5_bus = bmp_sensors[bmp_idx].bmp_bus;
+
+  int8_t rslt = BMP5_OK;
+
+  if (BME58X_CHIPID == bmp_sensors[bmp_idx].bmp_type) {
+
+    // Trigger the next measurement if you would like to read data out continuously
+    rslt = bmp5_set_power_mode(BMP5_POWERMODE_FORCED, &bmp5_device[bmp_idx]);
+    AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: read set power result %d"), rslt);  
+    if (rslt != BMP5_OK) { return; }
+
+    struct bmp5_sensor_data data;
+    rslt = bmp5_get_sensor_data(&data, &bmp5_osr_odr_press_cfg[bmp_idx], &bmp5_device[bmp_idx]);
+    AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: read result %d Pressure:%d Temperature:%d"), rslt, data.pressure, data.temperature); 
+    if (rslt != BMP5_OK) { return; }
+
+    bmp_sensors[bmp_idx].bmp_temperature = data.temperature;          // Temperature in degree celsius
+    bmp_sensors[bmp_idx].bmp_pressure = data.pressure / 100.0f;        // Pressure in Pascal (converted to hPa)
+    
+  }
+
+  return;
+}
+
+#endif //USE_BME58X
+
 /********************************************************************************************/
 
 void BmpDetect(void) {
@@ -509,7 +611,7 @@ void BmpDetect(void) {
       bmp_type = I2cRead8(BME58X_addresses[i &1], BME58X_REGISTER_CHIPID, bus);
       AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: BME58X Type %d"), bmp_type);
     }
-#endif
+#endif //USE_BME58X
 
     if (bmp_type) {
       bmp_sensors[bmp_count].bmp_address = bmp_addresses[i &1];
@@ -537,7 +639,7 @@ void BmpDetect(void) {
 #ifdef USE_BME58X
         case BME58X_CHIPID:
           bmp_sensors[bmp_count].bmp_model = 4;  // 4
-          //success = Bme58XInit(bmp_count);
+          success = Bme5Init(bmp_count);
           break;
 #endif
       }
@@ -569,6 +671,11 @@ void BmpRead(void) {
         Bme680Read(bmp_idx);
         break;
 #endif  // USE_BME68X
+#ifdef USE_BME58X
+      case BME58X_CHIPID:
+        Bme5Read(bmp_idx);
+        break;
+#endif  // USE_BME58X
     }
   }
 }
@@ -699,6 +806,9 @@ void BMP_EnterSleep(void) {
         case BME280_CHIPID:
           I2cWrite8(bmp_sensors[bmp_idx].bmp_address, BMP_REGISTER_RESET, BMP_CMND_RESET, bmp_sensors[bmp_idx].bmp_bus);
           break;
+        case BME58X_CHIPID:
+          I2cWrite8(bmp_sensors[bmp_idx].bmp_address, BME58X_REGISTER_RESET, BMP_CMND_RESET, bmp_sensors[bmp_idx].bmp_bus);
+          break;          
         default:
           break;
       }
