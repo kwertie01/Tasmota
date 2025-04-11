@@ -33,10 +33,6 @@
 #define USE_BME68X
 #endif
 
-//#ifdef USE_BME58X
-//#else
-//#endif
-
 #define BME58X_ADDR1         0x46
 #define BME58X_ADDR2         0x47
 #define BMP_ADDR1            0x76
@@ -63,7 +59,7 @@
   #define BMP_MAX_SENSORS    2
 #endif
 
-const char kBmpTypes[] PROGMEM = "BMP180|BMP280|BME280|BME680|BME58X";
+const char kBmpTypes[] PROGMEM = "BMP180|BMP280|BME280|BME680|BME580";
 
 typedef struct {
   uint8_t bmp_address;    // I2C address
@@ -489,6 +485,9 @@ void Bme680Read(uint8_t bmp_idx) {
 #endif  // USE_BME68X
 
 #ifdef USE_BME58X
+/*********************************************************************************************\
+ * BME58x support by Bosch https://github.com/boschsensortec/BMP5_SensorAPI
+\*********************************************************************************************/
 
 #include <bmp5.h>
 
@@ -513,6 +512,10 @@ int8_t Bmp5_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, v
 
 bool Bme5Init(uint8_t bmp_idx) {
   Bmp5_bus = bmp_sensors[bmp_idx].bmp_bus;
+  
+  int8_t rslt;
+  uint8_t por_status;
+  uint8_t nvm_status;
 
   if (!bmp5_device) {
     bmp5_device = (bmp5_dev*)malloc(BMP_MAX_SENSORS * sizeof(bmp5_dev));
@@ -526,8 +529,8 @@ bool Bme5Init(uint8_t bmp_idx) {
   bmp5_device[bmp_idx].read = Bmp5_i2c_read;
   bmp5_device[bmp_idx].write = Bmp5_i2c_write;
   bmp5_device[bmp_idx].delay_us = Bmp5_Delayus;
-  int8_t rslt = bmp5_init(&bmp5_device[bmp_idx]);
-  AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: init result %d"), rslt);
+
+  rslt = bmp5_get_interrupt_status(&por_status, &bmp5_device[bmp_idx]);
   if (rslt != BMP5_OK) { return false; }
 
   // Make sure it is in standby mode to start
@@ -542,7 +545,6 @@ bool Bme5Init(uint8_t bmp_idx) {
   bmp5_osr_odr_press_cfg[bmp_idx].osr_t = BMP5_OVERSAMPLING_64X;   // temperature Over-sampling
   bmp5_osr_odr_press_cfg[bmp_idx].osr_p = BMP5_OVERSAMPLING_128X;  // pressure Over-sampling
   rslt = bmp5_set_osr_odr_press_config(&bmp5_osr_odr_press_cfg[bmp_idx], &bmp5_device[bmp_idx]);
-  AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: osr odr result %d"), rslt);
   if (rslt != BMP5_OK) { return false; }
 
   // Set filter
@@ -556,7 +558,7 @@ bool Bme5Init(uint8_t bmp_idx) {
     bmp5_set_iir_cfg[bmp_idx].shdw_set_iir_t = BMP5_ENABLE;
     bmp5_set_iir_cfg[bmp_idx].shdw_set_iir_p = BMP5_ENABLE;
     rslt = bmp5_set_iir_config(&bmp5_set_iir_cfg[bmp_idx], &bmp5_device[bmp_idx]);
-    AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: iir filter result %d"), rslt);  
+    if (rslt != BMP5_OK) { return false; }
   }
 
   return true;
@@ -570,14 +572,11 @@ void Bme5Read(uint8_t bmp_idx) {
 
   if (BME58X_CHIPID == bmp_sensors[bmp_idx].bmp_type) {
 
-    // Trigger the next measurement if you would like to read data out continuously
     rslt = bmp5_set_power_mode(BMP5_POWERMODE_FORCED, &bmp5_device[bmp_idx]);
-    AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: read set power result %d"), rslt);  
     if (rslt != BMP5_OK) { return; }
 
     struct bmp5_sensor_data data;
     rslt = bmp5_get_sensor_data(&data, &bmp5_osr_odr_press_cfg[bmp_idx], &bmp5_device[bmp_idx]);
-    AddLog(LOG_LEVEL_DEBUG, PSTR("BME5: read result %d Pressure:%d Temperature:%d"), rslt, data.pressure, data.temperature); 
     if (rslt != BMP5_OK) { return; }
 
     bmp_sensors[bmp_idx].bmp_temperature = data.temperature;          // Temperature in degree celsius
@@ -595,26 +594,36 @@ void Bme5Read(uint8_t bmp_idx) {
 void BmpDetect(void) {
   if (!bmp_sensors) {
     bmp_sensors = (bmp_sensors_t*)calloc(BMP_MAX_SENSORS, sizeof(bmp_sensors_t));
-    AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: init bmp_sensors BMP_MAX_SENSORS: %d"), BMP_MAX_SENSORS);
   }
   if (!bmp_sensors) { return; }
 
   for (uint32_t i = 0; i < BMP_MAX_SENSORS; i++) {
     uint8_t bus = i >>1;
-    AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: i=%d - bus=%d"), i, bus);  
-    if (!I2cSetDevice(bmp_addresses[i &1], bus)) { continue; }
-    AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: i=%d - bus=%d - bmp_addresses[i &1]=%d"), i, bus, bmp_addresses[i &1]);    
-    uint8_t bmp_type = I2cRead8(bmp_addresses[i &1], BMP_REGISTER_CHIPID, bus);
-    AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: BMP Type %d"), bmp_type);
-#ifdef USE_BME58X
-    if (!bmp_type) {
-      bmp_type = I2cRead8(BME58X_addresses[i &1], BME58X_REGISTER_CHIPID, bus);
-      AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: BME58X Type %d"), bmp_type);
-    }
-#endif //USE_BME58X
+    uint8_t bmp_type;
+    uint8_t address;
+    uint8_t chipidregister;
 
+    if (!I2cSetDevice(bmp_addresses[i &1], bus)) { 
+#ifdef USE_BME58X
+      if (!I2cSetDevice(BME58X_addresses[i &1], bus)) { continue; }
+      else
+      {
+          address = BME58X_addresses[i &1];
+          chipidregister = BME58X_REGISTER_CHIPID;
+      }
+#else
+      continue;
+#endif //USE_BME58X      
+    }
+    else
+    {
+      address = bmp_addresses[i &1];
+      chipidregister = BMP_REGISTER_CHIPID;          
+    }
+    
+    bmp_type = I2cRead8(address, chipidregister, bus);
     if (bmp_type) {
-      bmp_sensors[bmp_count].bmp_address = bmp_addresses[i &1];
+      bmp_sensors[bmp_count].bmp_address = address;
       bmp_sensors[bmp_count].bmp_bus = bus;
       bmp_sensors[bmp_count].bmp_type = bmp_type;
       bmp_sensors[bmp_count].bmp_model = 0;
@@ -744,20 +753,20 @@ void BmpShow(bool json) {
         ResponseAppend_P(PSTR(",\"%s\":{\"" D_JSON_TEMPERATURE "\":%*_f%s,\"" D_JSON_PRESSURE "\":%s%s%s}"),
           name,
           Settings->flag2.temperature_resolution, &bmp_temperature,
-          (bmp_sensors[bmp_idx].bmp_model >= 2) ? json_humidity : "",
+          (bmp_sensors[bmp_idx].bmp_model == 2 || bmp_sensors[bmp_idx].bmp_model == 3) ? json_humidity : "",
           pressure,
           (Settings->altitude != 0) ? json_sealevel : "",
-          (bmp_sensors[bmp_idx].bmp_model >= 3) ? json_gas : "");
+          (bmp_sensors[bmp_idx].bmp_model == 3) ? json_gas : "");
 #else
         ResponseAppend_P(PSTR(",\"%s\":{\"" D_JSON_TEMPERATURE "\":%*_f%s,\"" D_JSON_PRESSURE "\":%s%s}"),
-          name, Settings->flag2.temperature_resolution, &bmp_temperature, (bmp_sensors[bmp_idx].bmp_model >= 2) ? json_humidity : "", pressure, (Settings->altitude != 0) ? json_sealevel : "");
+          name, Settings->flag2.temperature_resolution, &bmp_temperature, (bmp_sensors[bmp_idx].bmp_model == 2 || bmp_sensors[bmp_idx].bmp_model == 3) ? json_humidity : "", pressure, (Settings->altitude != 0) ? json_sealevel : "");
 #endif  // USE_BME68X
 
 #ifdef USE_DOMOTICZ
         if ((0 == TasmotaGlobal.tele_period) && (0 == bmp_idx)) {  // We want the same first sensor to report to Domoticz in case a read is missed
           DomoticzTempHumPressureSensor(bmp_temperature, bmp_humidity, bmp_pressure);
 #ifdef USE_BME68X
-          if (bmp_sensors[bmp_idx].bmp_model >= 3) { DomoticzSensor(DZ_AIRQUALITY, (uint32_t)bmp_sensors[bmp_idx].bmp_gas_resistance); }
+          if (bmp_sensors[bmp_idx].bmp_model == 3) { DomoticzSensor(DZ_AIRQUALITY, (uint32_t)bmp_sensors[bmp_idx].bmp_gas_resistance); }
 #endif  // USE_BME68X
         }
 #endif  // USE_DOMOTICZ
@@ -772,7 +781,7 @@ void BmpShow(bool json) {
 #ifdef USE_WEBSERVER
       } else {
         WSContentSend_Temp(name, bmp_temperature);
-        if (bmp_sensors[bmp_idx].bmp_model >= 2) {
+        if (bmp_sensors[bmp_idx].bmp_model == 2 || bmp_sensors[bmp_idx].bmp_model == 3) {
           WSContentSend_PD(HTTP_SNS_HUM, name, humidity);
           WSContentSend_PD(HTTP_SNS_DEW, name, dewpoint, TempUnit());
 #ifdef USE_HEAT_INDEX
@@ -784,7 +793,7 @@ void BmpShow(bool json) {
           WSContentSend_PD(HTTP_SNS_SEAPRESSURE, name, sea_pressure, PressureUnit().c_str());
         }
 #ifdef USE_BME68X
-        if (bmp_sensors[bmp_idx].bmp_model >= 3) {
+        if (bmp_sensors[bmp_idx].bmp_model == 3) {
           WSContentSend_PD(PSTR("{s}%s " D_GAS "{m}%s " D_UNIT_KILOOHM "{e}"), name, gas_resistance);
         }
 #endif  // USE_BME68X
