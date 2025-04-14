@@ -23,27 +23,26 @@
  *
  * Source: Heiko Krupp and Adafruit Industries
  *
- * I2C Address: 0x76 or 0x77 or 0x46 or 0x47
+ * I2C Address: 0x76 or 0x77 or (0x46 or 0x47 for BME58x)
 \*********************************************************************************************/
 
-#define XSNS_09              9
-#define XI2C_10              10  // See I2CDEVICES.md
+#define XSNS_09                 9
+#define XI2C_10                 10  // See I2CDEVICES.md
 
 #ifdef USE_BME680
 #define USE_BME68X
 #endif
 
-#define BME58X_ADDR1         0x46
-#define BME58X_ADDR2         0x47
-#define BMP_ADDR1            0x76
-#define BMP_ADDR2            0x77
+#define BME58X_ADDR1            0x46
+#define BME58X_ADDR2            0x47
+#define BMP_ADDR1               0x76
+#define BMP_ADDR2               0x77
 
-
-#define BMP180_CHIPID        0x55
-#define BMP280_CHIPID        0x58
-#define BME280_CHIPID        0x60
-#define BME58X_CHIPID        0x50
-#define BME680_CHIPID        0x61
+#define BMP180_CHIPID           0x55
+#define BMP280_CHIPID           0x58
+#define BME280_CHIPID           0x60
+#define BME58X_CHIPID           0x50
+#define BME680_CHIPID           0x61
 
 #define BME58X_REGISTER_CHIPID  0x01
 #define BMP_REGISTER_CHIPID     0xD0
@@ -51,12 +50,12 @@
 #define BME58X_REGISTER_RESET   0x7E  // CMND Register to reset to power on defaults (used for sleep)
 #define BMP_REGISTER_RESET      0xE0  // Register to reset to power on defaults (used for sleep)
 
-#define BMP_CMND_RESET       0xB6  // I2C Parameter for RESET to put BMP into reset state
+#define BMP_CMND_RESET          0xB6  // I2C Parameter for RESET to put BMP into reset state
 
 #ifdef USE_I2C_BUS2
-  #define BMP_MAX_SENSORS    4     // 2 busses
+  #define BMP_MAX_SENSORS       4     // 2 busses
 #else
-  #define BMP_MAX_SENSORS    2
+  #define BMP_MAX_SENSORS       2
 #endif
 
 const char kBmpTypes[] PROGMEM = "BMP180|BMP280|BME280|BME680|BME580";
@@ -512,10 +511,8 @@ int8_t Bmp5_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, v
 
 bool Bme5Init(uint8_t bmp_idx) {
   Bmp5_bus = bmp_sensors[bmp_idx].bmp_bus;
-  
   int8_t rslt;
   uint8_t por_status;
-  uint8_t nvm_status;
 
   if (!bmp5_device) {
     bmp5_device = (bmp5_dev*)malloc(BMP_MAX_SENSORS * sizeof(bmp5_dev));
@@ -529,7 +526,6 @@ bool Bme5Init(uint8_t bmp_idx) {
   bmp5_device[bmp_idx].read = Bmp5_i2c_read;
   bmp5_device[bmp_idx].write = Bmp5_i2c_write;
   bmp5_device[bmp_idx].delay_us = Bmp5_Delayus;
-
   rslt = bmp5_get_interrupt_status(&por_status, &bmp5_device[bmp_idx]);
   if (rslt != BMP5_OK) { return false; }
 
@@ -540,7 +536,7 @@ bool Bme5Init(uint8_t bmp_idx) {
   // Enable pressure measurements (automatically enables temperature measurements)
   bmp5_osr_odr_press_cfg[bmp_idx].press_en = BMP5_ENABLE;
   // Set ODR as 10Hz
-  bmp5_osr_odr_press_cfg[bmp_idx].odr = BMP5_ODR_10_HZ;  
+  bmp5_osr_odr_press_cfg[bmp_idx].odr = BMP5_ODR_10_HZ;
   // Set Over-sampling rate with respect to odr
   bmp5_osr_odr_press_cfg[bmp_idx].osr_t = BMP5_OVERSAMPLING_64X;   // temperature Over-sampling
   bmp5_osr_odr_press_cfg[bmp_idx].osr_p = BMP5_OVERSAMPLING_128X;  // pressure Over-sampling
@@ -550,7 +546,6 @@ bool Bme5Init(uint8_t bmp_idx) {
   // Set filter
   bmp5_set_iir_cfg[bmp_idx].iir_flush_forced_en = BMP5_ENABLE;
   rslt = bmp5_set_iir_config(&bmp5_set_iir_cfg[bmp_idx], &bmp5_device[bmp_idx]);
-
   if (rslt == BMP5_OK)
   {
     bmp5_set_iir_cfg[bmp_idx].set_iir_t = BMP5_IIR_FILTER_COEFF_1;
@@ -560,14 +555,13 @@ bool Bme5Init(uint8_t bmp_idx) {
     rslt = bmp5_set_iir_config(&bmp5_set_iir_cfg[bmp_idx], &bmp5_device[bmp_idx]);
     if (rslt != BMP5_OK) { return false; }
   }
-
   return true;
 }
+
 void Bme5Read(uint8_t bmp_idx) {
   if (!bmp5_device) { return; }
 
   Bmp5_bus = bmp_sensors[bmp_idx].bmp_bus;
-
   int8_t rslt = BMP5_OK;
 
   if (BME58X_CHIPID == bmp_sensors[bmp_idx].bmp_type) {
@@ -579,11 +573,9 @@ void Bme5Read(uint8_t bmp_idx) {
     rslt = bmp5_get_sensor_data(&data, &bmp5_osr_odr_press_cfg[bmp_idx], &bmp5_device[bmp_idx]);
     if (rslt != BMP5_OK) { return; }
 
-    bmp_sensors[bmp_idx].bmp_temperature = data.temperature;          // Temperature in degree celsius
-    bmp_sensors[bmp_idx].bmp_pressure = data.pressure / 100.0f;        // Pressure in Pascal (converted to hPa)
-    
+    bmp_sensors[bmp_idx].bmp_temperature = data.temperature;     // Temperature in degree celsius
+    bmp_sensors[bmp_idx].bmp_pressure = data.pressure / 100.0f;  // Pressure in Pascal (converted to hPa)
   }
-
   return;
 }
 
@@ -620,7 +612,7 @@ void BmpDetect(void) {
       address = bmp_addresses[i &1];
       chipidregister = BMP_REGISTER_CHIPID;          
     }
-    
+
     bmp_type = I2cRead8(address, chipidregister, bus);
     if (bmp_type) {
       bmp_sensors[bmp_count].bmp_address = address;
