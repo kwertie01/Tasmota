@@ -119,8 +119,11 @@ The latter links can be used for OTA upgrades too like ``OtaUrl https://ota.tasm
 - Extend command `GPIO` with different display options and allowing updating of module GPIO's in one go
 - Support Vango Technologies V924x ultralow power, single-phase, power measurement [#23127](https://github.com/arendst/Tasmota/issues/23127)
 - Support for HLK-LD2402 24GHz smart wave motion sensor [#23133](https://github.com/arendst/Tasmota/issues/23133)
-- Telnet server using command `Telnet <0|1|port>[,<IP filter>]`
+- Support for Telnet server using command `Telnet <0|1|port>[,<IP filter>]` if enabled with `#define USE_TELNET`
+- Support for XMODEM over serial and telnet if enabled with `#define USE_XYZMODEM`
+- PZEM_AC device address in JSON and GUI [#23268](https://github.com/arendst/Tasmota/issues/23268)
 - Allow acl in mqtt when client certificate is in use with `#define USE_MQTT_CLIENT_CERT` [#22998](https://github.com/arendst/Tasmota/issues/22998)
+- AlpineJS 2.8.2 - optional for now [#23259](https://github.com/arendst/Tasmota/issues/23259)
 - Berry experimental driver for AXP2101 for M5Core2v1.1 [#23039](https://github.com/arendst/Tasmota/issues/23039)
 - Berry `tasmota.when_network_up()` and simplified Matter using it [#23057](https://github.com/arendst/Tasmota/issues/23057)
 - Berry `introspect.solidified()` to know if a Berry object is solidified or in RAM [#23063](https://github.com/arendst/Tasmota/issues/23063)
@@ -128,19 +131,23 @@ The latter links can be used for OTA upgrades too like ``OtaUrl https://ota.tasm
 - Berry load `.tapp` files in `/.extensions/` then in `/` [#23113](https://github.com/arendst/Tasmota/issues/23113)
 - Berry `re.dump()` [#23162](https://github.com/arendst/Tasmota/issues/23162)
 - Berry `bytes.add()` now accepts 3-bytes values [#23200](https://github.com/arendst/Tasmota/issues/23200)
+- Berry expose `esp_http_server` for websockets [#23206](https://github.com/arendst/Tasmota/issues/23206)
 - Matter prepare for ICD cluster [#23158](https://github.com/arendst/Tasmota/issues/23158)
 - LVGL experimental mirroring of display on Web UI [#23041](https://github.com/arendst/Tasmota/issues/23041)
 - HASPmota autostart when `pages.jsonl` exists [#23181](https://github.com/arendst/Tasmota/issues/23181)
 
 ### Breaking Changed
 - Berry remove `Leds.create_matrix` from the standard library waiting for reimplementation [#23114](https://github.com/arendst/Tasmota/issues/23114)
+- HASPmota added `y2_min` and `y2_max` to control the second series of `chart` [#23287](https://github.com/arendst/Tasmota/issues/23287)
+- HASPmota default theme is now Tasmota-style [#23288](https://github.com/arendst/Tasmota/issues/23288)
 
 ### Changed
-- ESP32 Platform from 2025.02.30 to 2025.03.30, Framework (Arduino Core) from v3.1.1.250203 to v3.1.3.250302 and IDF from v5.3.2.250120 to 5.3.2.250228 [#23088](https://github.com/arendst/Tasmota/issues/23088)
+- ESP32 Platform from 2025.02.30 to 2025.04.30, Framework (Arduino Core) from v3.1.1.250203 to v3.1.3.250411 and IDF from v5.3.2.250120 to 5.3.2.250403 [#23280](https://github.com/arendst/Tasmota/issues/23280)
 - Output of commands `GPIO` and `GPIOs` swapped
 - Smoothen light gamma curve when using `Fade` [#23230](https://github.com/arendst/Tasmota/issues/23230)
 - RCSwitch `RCSWITCH_SEPARATION_LIMIT` from 4100 to 3600
 - GPIOViewer from v1.6.1 to v1.6.2 (No functional change)
+- HLK-LD2402 updates for firmware 3.3.5+ [#23281](https://github.com/arendst/Tasmota/issues/23281)
 - ESP8266 enable FTP for >= 4MB variants [#23120](https://github.com/arendst/Tasmota/issues/23120)
 - ESP32 enable webcam version 2 [#18732](https://github.com/arendst/Tasmota/issues/18732)
 - Berry update flasher for Sonoff ZBBridge Pro [#23136](https://github.com/arendst/Tasmota/issues/23136)
@@ -157,5 +164,6 @@ The latter links can be used for OTA upgrades too like ``OtaUrl https://ota.tasm
 - ESP32 intermittent exception on WiFi AP cannot be reached [#23115](https://github.com/arendst/Tasmota/issues/23115)
 - ESP32-C3 WiFi sleep [#23096](https://github.com/arendst/Tasmota/issues/23096)
 - Berry prevent `import` from hiding a solidified class [#23112](https://github.com/arendst/Tasmota/issues/23112)
+- Berry `readline` when a line is exactly 98 characters [#23276](https://github.com/arendst/Tasmota/issues/23276)
 
 ### Removed
