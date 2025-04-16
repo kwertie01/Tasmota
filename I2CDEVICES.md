@@ -130,5 +130,6 @@ Index | Define              | Driver   | Device   | Address(es) | Bus2 | Descrip
   90  | USE_RX8010          | xdrv_56  | RX8010    | 0x32       | Yes  | RX8010 RTC from IOTTIMER
   91  | USE_MS5837          | xsns_116 | MS5837    | 0x76       |      | Pressure and temperature sensor
   92  | USE_PCF85063        | xdrv_56  | PCF85063  | 0x51       |      | PCF85063 Real time clock
+  93  | USE_DPS3X           | xsns_128 | DPS310    | 0x76, 0x77 | Yes  | Pressure and temperature sensor
 
   NOTE: Bus2 supported on ESP32 only.
