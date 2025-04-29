@@ -27,7 +27,7 @@ protected:
 
     /////// implement pure virtual functions ///////
 
-    void init(void);
+    uint8_t init(void);
     int16_t configTemp(uint8_t temp_mr, uint8_t temp_osr);
     int16_t configPressure(uint8_t prs_mr, uint8_t prs_osr);
     int16_t readcoeffs(void);

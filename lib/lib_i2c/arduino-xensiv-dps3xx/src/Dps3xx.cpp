@@ -23,14 +23,14 @@ int16_t Dps3xx::setInterruptSources(uint8_t intr_source, uint8_t polarity)
     return writeByteBitfield(intr_source, registers[INT_SEL]) || writeByteBitfield(polarity, registers[INT_HL]);
 }
 
-void Dps3xx::init(void)
+uint8_t Dps3xx::init(void)
 {
     int16_t prodId = readByteBitfield(registers[PROD_ID]);
     if (prodId < 0)
     {
         // Connected device is not a Dps3xx
         m_initFail = 1U;
-        return;
+        return m_initFail;
     }
     m_productID = prodId;
 
@@ -38,7 +38,7 @@ void Dps3xx::init(void)
     if (revId < 0)
     {
         m_initFail = 1U;
-        return;
+        return m_initFail;
     }
     m_revisionID = revId;
 
@@ -47,7 +47,7 @@ void Dps3xx::init(void)
     if (sensor < 0)
     {
         m_initFail = 1U;
-        return;
+        return m_initFail;
     }
 
     //...and use this sensor for temperature measurement
@@ -55,14 +55,14 @@ void Dps3xx::init(void)
     if (writeByteBitfield((uint8_t)sensor, registers[TEMP_SENSOR]) < 0)
     {
         m_initFail = 1U;
-        return;
+        return m_initFail;
     }
 
     // read coefficients
     if (readcoeffs() < 0)
     {
         m_initFail = 1U;
-        return;
+        return m_initFail;
     }
 
     // set to standby for further configuration
@@ -84,6 +84,7 @@ void Dps3xx::init(void)
     // Fix IC with a fuse bit problem, which lead to a wrong temperature
     // Should not affect ICs without this problem
     correctTemp();
+    return m_initFail;
 }
 
 int16_t Dps3xx::readcoeffs(void)

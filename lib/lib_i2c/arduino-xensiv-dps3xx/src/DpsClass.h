@@ -38,15 +38,16 @@ public:
     /**
      * I2C begin function with standard address
      */
-    void begin(TwoWire &bus);
-
+    uint8_t begin(TwoWire &bus);
+    
+    uint8_t begin(uint8_t slaveAddress);
     /**
      * Standard I2C begin function
      *
      * @param &bus:             I2CBus which connects MC to the sensor
      * @param slaveAddress:     I2C address of the sensor (0x77 or 0x76)
      */
-    void begin(TwoWire &bus, uint8_t slaveAddress);
+    uint8_t begin(TwoWire &bus, uint8_t slaveAddress);
 
 #ifndef DPS_DISABLESPI
     /**
@@ -99,9 +100,19 @@ public:
     int16_t measureTempOnce(float &result);
 
     /**
+     * performs one temperature measurement
+     *
+     * @param &result:              reference to a float value where the result will be written
+     * @param slaveAddress:         slave address of sensor device
+     * @return 	status code
+     */
+    int16_t measureTempOnce(float &result, uint8_t slaveAddress);
+
+    /**
      * performs one temperature measurement with specified oversamplingRate
      *
      * @param &result:              reference to a float where the result will be written
+     * @param slaveAddress:         slave address of sensor device
      * @param oversamplingRate:     DPS__OVERSAMPLING_RATE_1, DPS__OVERSAMPLING_RATE_2,
      *                              DPS__OVERSAMPLING_RATE_4 ... DPS__OVERSAMPLING_RATE_128,
      *                              which are defined as integers 0 - 7
@@ -110,7 +121,7 @@ public:
      *                              return a more exact measurement
      * @return   status code
      */
-    int16_t measureTempOnce(float &result, uint8_t oversamplingRate);
+    int16_t measureTempOnce(float &result, uint8_t slaveAddress, uint8_t oversamplingRate);
 
     /**
      * starts a single temperature measurement
@@ -137,14 +148,24 @@ public:
     int16_t measurePressureOnce(float &result);
 
     /**
+     * performs one pressure measurement
+     *
+     * @param &result:              reference to a float value where the result will be written
+     * @param slaveAddress:         slave address of sensor device
+     * @return 	status code
+     */
+    int16_t measurePressureOnce(float &result, uint8_t slaveAddress);
+
+    /**
      * performs one pressure measurement with specified oversamplingRate
      *
      * @param &result:              reference to a float where the result will be written
+     * @param slaveAddress:         slave address of sensor device
      * @param oversamplingRate:     DPS__OVERSAMPLING_RATE_1, DPS__OVERSAMPLING_RATE_2,
      *                              DPS__OVERSAMPLING_RATE_4 ... DPS__OVERSAMPLING_RATE_128
      * @return  status code
      */
-    int16_t measurePressureOnce(float &result, uint8_t oversamplingRate);
+    int16_t measurePressureOnce(float &result, uint8_t slaveAddress, uint8_t oversamplingRate);
 
     /**
      * starts a single pressure measurement
@@ -285,7 +306,7 @@ protected:
      * This function has to be called from begin()
      * and requires a valid bus initialization.
      */
-    virtual void init(void) = 0;
+    virtual uint8_t init(void) = 0;
 
     /**
      * reads the compensation coefficients from the sensor

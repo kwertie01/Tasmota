@@ -16,12 +16,12 @@ DpsClass::~DpsClass(void)
     end();
 }
 
-void DpsClass::begin(TwoWire &bus)
+uint8_t DpsClass::begin(TwoWire &bus)
 {
-    begin(bus, DPS__STD_SLAVE_ADDRESS);
+    return begin(bus, DPS__STD_SLAVE_ADDRESS);
 }
 
-void DpsClass::begin(TwoWire &bus, uint8_t slaveAddress)
+uint8_t DpsClass::begin(TwoWire &bus, uint8_t slaveAddress)
 {
     // this flag will show if the initialization was successful
     m_initFail = 0U;
@@ -37,6 +37,11 @@ void DpsClass::begin(TwoWire &bus, uint8_t slaveAddress)
     delay(50); // startup time of Dps3xx
 
     init();
+    return m_initFail;
+}
+uint8_t DpsClass::begin(uint8_t slaveAddress)
+{
+	return begin(Wire, slaveAddress);
 }
 
 #ifndef DPS_DISABLESPI
@@ -203,15 +208,26 @@ int16_t DpsClass::getSingleResult(float &result)
 
 int16_t DpsClass::measureTempOnce(float &result)
 {
-    return measureTempOnce(result, m_tempOsr);
+    return measureTempOnce(result, m_slaveAddress, m_tempOsr);
 }
 
-int16_t DpsClass::measureTempOnce(float &result, uint8_t oversamplingRate)
+int16_t DpsClass::measureTempOnce(float &result, uint8_t slaveAddress)
 {
+    return measureTempOnce(result, slaveAddress, m_tempOsr);
+}
+
+int16_t DpsClass::measureTempOnce(float &result, uint8_t slaveAddress, uint8_t oversamplingRate)
+{
+    //Set I2C bus connection
+    m_slaveAddress = slaveAddress;
     // Start measurement
     int16_t ret = startMeasureTempOnce(oversamplingRate);
     if (ret != DPS__SUCCEEDED)
     {
+        if (ret == DPS__FAIL_TOOBUSY)
+		{
+			standby();
+		}
         return ret;
     }
 
@@ -260,15 +276,26 @@ int16_t DpsClass::startMeasureTempOnce(uint8_t oversamplingRate)
 
 int16_t DpsClass::measurePressureOnce(float &result)
 {
-    return measurePressureOnce(result, m_prsOsr);
+    return measurePressureOnce(result, m_slaveAddress, m_prsOsr);
 }
 
-int16_t DpsClass::measurePressureOnce(float &result, uint8_t oversamplingRate)
+int16_t DpsClass::measurePressureOnce(float &result, uint8_t slaveAddress)
 {
+    return measurePressureOnce(result, slaveAddress, m_prsOsr);
+}
+
+int16_t DpsClass::measurePressureOnce(float &result, uint8_t slaveAddress, uint8_t oversamplingRate)
+{
+    //Set I2C bus connection
+    m_slaveAddress = slaveAddress;
     // start the measurement
     int16_t ret = startMeasurePressureOnce(oversamplingRate);
     if (ret != DPS__SUCCEEDED)
     {
+        if (ret == DPS__FAIL_TOOBUSY)
+		{
+			standby();
+		}
         return ret;
     }
 
