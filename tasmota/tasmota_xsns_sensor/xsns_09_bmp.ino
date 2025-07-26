@@ -642,7 +642,7 @@ void BmpDetect(void) {
           bmp_sensors[bmp_count].bmp_model = 4;  // 4
           success = Bme5Init(bmp_count);
           break;
-#endif
+#endif  //USE_BME58X
       }
       if (success) {
         GetTextIndexed(bmp_sensors[bmp_count].bmp_name, sizeof(bmp_sensors[bmp_count].bmp_name), bmp_sensors[bmp_count].bmp_model, kBmpTypes);
